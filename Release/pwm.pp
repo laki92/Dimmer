@@ -15,6 +15,7 @@ pwm.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/timer.h
 pwm.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/utils.h
 pwm.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/prcm.h
 pwm.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/pin.h
+pwm.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/gpio.h
 
 ../pwm.c: 
 ../pwm.h: 
@@ -31,3 +32,4 @@ C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/timer.h:
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/utils.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/prcm.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/pin.h: 
+C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/gpio.h: 

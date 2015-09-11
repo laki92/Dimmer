@@ -103,6 +103,7 @@
 #define BLINKY_MES				"__SL_P_ULDBLINKY"
 #define SET_COLOR				"__SL_P_ULDCOLOR"
 #define CHANGE_MODE_STR         "Change_mode"
+#define INI_TAST_TASK_STRING	"nathing"
 #define blink					0
 #define setCOLOR				1
 #define DebounceTimeT1			2
@@ -142,9 +143,8 @@ int g_iSimplelinkRole = ROLE_INVALID;
 signed int g_uiIpAddress = 0;
 unsigned char g_ucSSID[AP_SSID_LEN_MAX];
 
-OsiMsgQ_t MsgQCommands;// qeue for commands betwen http task and light control task
-OsiMsgQ_t MsgQConnection;
-OsiMsgQ_t MsgQTaster;
+OsiMsgQ_t MsgQCommands, MsgQConnection, MsgQTaster;// qeue for commands betwen http task and light control task
+OsiSyncObj_t Tast1,Tast2, ConnectSync;
 
 #if defined(ccs)
 extern void (* const g_pfnVectors[])(void);
@@ -670,7 +670,7 @@ static long ConfigureSimpleLinkToDefaultState() {
 	long lRetVal = -1;
 	long lMode = -1;
 
-	lMode = sl_Start(0, 0, 0);
+	lMode = sl_Start(NULL, NULL, NULL);
 	ASSERT_ON_ERROR(lMode);
 
 	// If the device is not in station-mode, try configuring it in station-mode
@@ -727,10 +727,10 @@ static long ConfigureSimpleLinkToDefaultState() {
 			SL_CONNECTION_POLICY(1, 0, 0, 0, 1), NULL, 0);
 	ASSERT_ON_ERROR(lRetVal);
 
-	// Remove all profiles
+	/*// Remove all profiles
 	lRetVal = sl_WlanProfileDel(0xFF);
 	ASSERT_ON_ERROR(lRetVal);
-
+*/
 	//
 	// Device in station-mode. Disconnect previous connection if any
 	// The function returns 0 if 'Disconnected done', negative number if already
@@ -961,88 +961,84 @@ static void ReadDeviceConfiguration() {
 //****************************************************************************
 static void HTTPServerTask(void *pvParameters) {
 
-	char ReConn[MSG_CONNECTION_LENGHT]="1";
+	//char ReConn[MSG_CONNECTION_LENGHT]="1";
 	//char *Command="1234";
 //	unsigned char Command2[4];
 	//int size;
 
 	while(1)
 	{
-		//Timer_IF_Start(ul_TimerA2Base, TIMER_A, 500);
+		long lRetVal = -1;
+		InitializeAppVariables();
+		//
+		// Following function configure the device to default state by cleaning
+		// the persistent settings stored in NVMEM (viz. connection profiles &
+		// policies, power policy etc)
+		//
+		// Applications may choose to skip this step if the developer is sure
+		// that the device is in its default state at start of applicaton
+		//
+		// Note that all profiles and persistent settings that were done on the
+		// device will be lost
+		//
+		lRetVal = ConfigureSimpleLinkToDefaultState();
+		if (lRetVal < 0) {
+			if (DEVICE_NOT_IN_STATION_MODE == lRetVal)
+				UART_PRINT("Failed to configure the device in its default state\n\r");
 
-		if(atoi(ReConn) >= 0)
-			{
-			long lRetVal = -1;
-			InitializeAppVariables();
-			//
-			// Following function configure the device to default state by cleaning
-			// the persistent settings stored in NVMEM (viz. connection profiles &
-			// policies, power policy etc)
-			//
-			// Applications may choose to skip this step if the developer is sure
-			// that the device is in its default state at start of applicaton
-			//
-			// Note that all profiles and persistent settings that were done on the
-			// device will be lost
-			//
-			lRetVal = ConfigureSimpleLinkToDefaultState();
-			if (lRetVal < 0) {
-				if (DEVICE_NOT_IN_STATION_MODE == lRetVal)
-					UART_PRINT("Failed to configure the device in its default state\n\r");
-
-				LOOP_FOREVER()
-				;
-			}
-
-			UART_PRINT("Device is configured in default state \n\r");
-
-			memset(g_ucSSID, '\0', AP_SSID_LEN_MAX);
-
-			//Read Device Mode Configuration
-			ReadDeviceConfiguration(); //provera da li radi u AP modu
-
-			//Connect to Network
-			lRetVal = ConnectToNetwork();
-
-			//Stop Internal HTTP Server
-			lRetVal = sl_NetAppStop(SL_NET_APP_HTTP_SERVER_ID);
-			if (lRetVal < 0) {
-				ERR_PRINT(lRetVal);
-				LOOP_FOREVER()
-				;
-			}
-
-			//Start Internal HTTP Server
-			lRetVal = sl_NetAppStart(SL_NET_APP_HTTP_SERVER_ID);
-			if (lRetVal < 0) {
-				ERR_PRINT(lRetVal);
-				LOOP_FOREVER()
-				;
-			}
-/*
-			lRetVal=CreateFileToDevice(&lFileHandle); //Alocate memory on flash
-			if (lRetVal < 0) {
-				ERR_PRINT(lRetVal);
-				}
-			//ReadFileFromDevice(ulToken, lFileHandle, Command);
-			//lRetVal=WriteFileToDevice(&lFileHandle, (long *)Command);
-			if (lRetVal < 0) {
-				ERR_PRINT(lRetVal);
-				}
-			size= sizeof(Command);
-			lRetVal=ReadFileFromDevice(lFileHandle,
-					size,
-					Command2);
-			if (lRetVal < 0) {
-				ERR_PRINT(lRetVal);
-				}
-			//Timer_IF_Stop(ul_TimerA2Base, TIMER_A);
-			UART_PRINT("Command2 \n\r", Command2);
-*/
-			UART_PRINT("CALLBACK WHILE");
-
-			osi_MsgQRead(&MsgQConnection, ReConn , OSI_WAIT_FOREVER);
+			LOOP_FOREVER()
+			;
 		}
+
+		UART_PRINT("Device is configured in default state \n\r");
+
+		memset(g_ucSSID, '\0', AP_SSID_LEN_MAX);
+
+		//Read Device Mode Configuration
+		ReadDeviceConfiguration(); //provera da li radi u AP modu
+
+		//Connect to Network
+		lRetVal = ConnectToNetwork();
+
+		//Stop Internal HTTP Server
+		lRetVal = sl_NetAppStop(SL_NET_APP_HTTP_SERVER_ID);
+		if (lRetVal < 0) {
+			ERR_PRINT(lRetVal);
+			LOOP_FOREVER()
+			;
+		}
+
+		//Start Internal HTTP Server
+		lRetVal = sl_NetAppStart(SL_NET_APP_HTTP_SERVER_ID);
+		if (lRetVal < 0) {
+			ERR_PRINT(lRetVal);
+			LOOP_FOREVER()
+			;
+		}
+/*
+		lRetVal=CreateFileToDevice(&lFileHandle); //Alocate memory on flash
+		if (lRetVal < 0) {
+			ERR_PRINT(lRetVal);
+			}
+		//ReadFileFromDevice(ulToken, lFileHandle, Command);
+		//lRetVal=WriteFileToDevice(&lFileHandle, (long *)Command);
+		if (lRetVal < 0) {
+			ERR_PRINT(lRetVal);
+			}
+		size= sizeof(Command);
+		lRetVal=ReadFileFromDevice(lFileHandle,
+				size,
+				Command2);
+		if (lRetVal < 0) {
+			ERR_PRINT(lRetVal);
+			}
+		//Timer_IF_Stop(ul_TimerA2Base, TIMER_A);
+		UART_PRINT("Command2 \n\r", Command2);
+*/
+		UART_PRINT("CALLBACK WHILE");
+
+		sl_SyncObjWait(&ConnectSync, OSI_WAIT_FOREVER);
+
 	}//Handle Async Events
 }
 
@@ -1120,34 +1116,51 @@ void LightControlTask(void *pvParameters)
 	}
 }
 
+
 void TasterTask (void *pvParameters)
 {
-	char *TasterCommand;
 	char TasterNumber;
-	char DebTast1;
-	char DebTast2;
-	char mode;
+	char DebTast1=0;
+	char DebTast2=0;
+	char mode=0;
 
-	while(1){
-		osi_MsgQRead(&MsgQTaster, TasterCommand, OSI_NO_WAIT);
-		TasterNumber=atoi(TasterCommand);
-		TasterCommand="";
+	while(1)
+	{
+		if(sl_SyncObjWait(&Tast1, OSI_NO_WAIT) == 0)
+		{
+			UART_PRINT("Tast 1 active");
+			TasterNumber=1;
+		}
+
+		if(sl_SyncObjWait(&Tast2, OSI_NO_WAIT) == 0)
+		{
+			UART_PRINT("Tast2 active");
+			TasterNumber=2;
+		}
 
 		if(TasterNumber==1)
 		{
-			if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_4)==1)
+			if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_4)==0)
 				DebTast1++;
 			else
 			{
 				DebTast1=0;
 				MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_4);
+				TasterNumber=0;
 			}
 			if(DebTast1==DebounceTimeT1)
-				osi_MsgQWrite(&MsgQConnection, "2", OSI_NO_WAIT);
+			{
+				sl_SyncObjSignal(&ConnectSync);
+				//osi_MsgQWrite(&MsgQConnection, "2", OSI_NO_WAIT);
+				DebTast1=0;
+				TasterNumber=0;
+				MAP_GPIOIntEnable(GPIOA0_BASE, GPIO_PIN_7);
+			}
+
 		}
 		if(TasterNumber==2)
 		{
-			if(GPIOPinRead(GPIOA0_BASE, GPIO_PIN_7)==2)
+			if(GPIOPinRead(GPIOA0_BASE, GPIO_PIN_7)==0)
 				DebTast2++;
 			else
 			{
@@ -1173,6 +1186,26 @@ void TasterTask (void *pvParameters)
 					 }
 			}
 		}
+		/*//Pwm1 overcurrent
+		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)){
+			PWM_Disable_1();
+			UART_PRINT("Overcurrent CH1 \n\r");
+			MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_1);
+			MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_1);
+		}
+		//Pwm2 overcurrent
+		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)){
+
+		}
+		//Pwm3 overcurrent
+		if(GPIOPinRead(GPIOA1_BASE, GPIO_PIN_7)){
+			PWM_Disable_3();
+			UART_PRINT("Overcurrent CH3\n\r");
+			MAP_GPIOIntClear(GPIOA1_BASE, GPIO_PIN_7);
+			MAP_GPIOIntEnable(GPIOA1_BASE, GPIO_PIN_7);
+		}
+		*/
+
 		osi_Sleep(100);
 	}
 }
@@ -1182,7 +1215,8 @@ void TasterTask (void *pvParameters)
 //
  void Taster1()
  {
-	 UART_PRINT("Tast1");
+	UART_PRINT("botton1 \n\r");
+	osi_SyncObjSignalFromISR(&Tast1);
 	MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_4);
 	MAP_GPIOIntDisable(GPIOA3_BASE, GPIO_PIN_4);
 }
@@ -1191,21 +1225,21 @@ void TasterTask (void *pvParameters)
 //
  void Taster2()
  {
-	 UART_PRINT("Tast2 \n\r");
-
+	 UART_PRINT("botton2 \n\r");
+	 osi_SyncObjSignalFromISR(&Tast2);
 	//Reincialize of innterrupt
 	 MAP_GPIOIntClear(GPIOA0_BASE, GPIO_PIN_7);
 	 MAP_GPIOIntDisable(GPIOA0_BASE, GPIO_PIN_7);
 }
 //Interrupt rutine for overcurent PWM1
-void TrunOffPWM1()
+/*void TrunOffPWM1()
 {
 	PWM_Disable_1();
 	UART_PRINT("Overcurrent CH1 \n\r");
 	MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_1);
 	MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_1);
 }
-
+*/
 //Interrupt rutine for overcurent PWM2
 
 /*void TrunOffPWM2()
@@ -1218,17 +1252,13 @@ void TrunOffPWM1()
 
 //Interrupt rutine for overcurent PWM3
 */
-void TrunOffPWM3()
+/*void TrunOffPWM3()
 {
-	PWM_Disable_3();
-	UART_PRINT("Overcurrent CH3\n\r");
-	MAP_GPIOIntClear(GPIOA1_BASE, GPIO_PIN_7);
-	MAP_GPIOIntEnable(GPIOA1_BASE, GPIO_PIN_7);
-}
 
+}
+*/
 void Bliky()
 {
-	//UART_PRINT("BLINKY");
 	pom^=1;
 	//
 	// Clear the timer interrupt.
@@ -1419,13 +1449,13 @@ void main() {
 	//
 	// Create HTTP Server Task
 	//
-	lRetVal = osi_TaskCreate(HTTPServerTask, (signed char*)"HTTPServerTask",
-	OSI_STACK_SIZE, NULL, OOB_TASK_PRIORITY,NULL);
+	lRetVal = osi_TaskCreate(HTTPServerTask, (signed char*)"HTTPServerTask", OSI_STACK_SIZE, NULL, OOB_TASK_PRIORITY,NULL);
 	if (lRetVal < 0) {
 		UART_PRINT("Unable to create task\n\r");
 		LOOP_FOREVER();
 	}
 	//
+
 	// Create Light Control Task
 	//
 	lRetVal = osi_TaskCreate(LightControlTask, (signed char*)"LightControlTask", OSI_STACK_SIZE, NULL, OOB_TASK_PRIORITY, NULL);
@@ -1438,6 +1468,7 @@ void main() {
 			UART_PRINT("Unable to create task\n\r");
 			LOOP_FOREVER();
 		}
+
 	//
 	// Creating a queue for 10 elements.
     //
@@ -1453,6 +1484,18 @@ void main() {
     lRetVal = osi_MsgQCreate(&MsgQTaster, "MsgQTaster", 8, 3);
     if(lRetVal < 0)
     	while(1);
+
+    osi_SyncObjCreate(&Tast1);
+    if(lRetVal < 0)
+       	UART_PRINT("Obj not create Task1\n\r");
+
+    osi_SyncObjCreate(&Tast2);
+    if(lRetVal < 0)
+    	UART_PRINT("Obj not create Task2\n\r");
+
+    osi_SyncObjCreate(&ConnectSync);
+        if(lRetVal < 0)
+        	UART_PRINT("Obj not create ConnectSync\n\r");
 
 	//
 	// Start OS Scheduler

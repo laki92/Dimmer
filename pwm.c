@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "prcm.h"
 #include "pin.h"
+#include "gpio.h"
 
 
 void SetupTimerPWMMode(unsigned long ulBase, unsigned long ulTimer,
@@ -67,18 +68,20 @@ unsigned char PWM_Init(unsigned int fpwm)
 void PWM_Disable_1()
 {
 	TimerDisable(TIMERA3_BASE, TIMER_A);
+	GPIOPinWrite(GPIOA3_BASE, GPIO_PIN_1, GPIO_PIN_1);
 
 }
 
 void PWM_Disable_2()
 {
-	TimerDisable(TIMERA3_BASE, TIMER_B);
+	//TimerDisable(TIMERA3_BASE, TIMER_B);
+	//GPIOPinWrite(GPIOA3_BASE, GPIO_PIN_1, GPIO_PIN_1);
 }
 
 void PWM_Disable_3()
 {
-	//TimerDisable(TIMERA2_BASE, TIMER_B);
-	PWM_Set3(100);
+	TimerDisable(TIMERA2_BASE, TIMER_B);
+	GPIOPinWrite(GPIOA1_BASE, GPIO_PIN_7, GPIO_PIN_7);
 
 }
 
