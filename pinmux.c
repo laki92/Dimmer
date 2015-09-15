@@ -55,9 +55,6 @@
 void
 PinMuxConfig(void)
 {
-
-	//unsigned char GPIO_port_address;
-//	unsigned char GPIOPin;
     //
     // Enable Peripheral Clocks 
     //
@@ -67,7 +64,8 @@ PinMuxConfig(void)
     MAP_PRCMPeripheralClkEnable(PRCM_GPIOA2, PRCM_RUN_MODE_CLK);
     MAP_PRCMPeripheralClkEnable(PRCM_GPIOA3, PRCM_RUN_MODE_CLK);
 
-
+    //Configure PIN_60 to ADC CH3
+    PinTypeADC(PIN_60,PIN_MODE_255);
 
     //
     // Configure PIN_55 for UART0 UART0_TX

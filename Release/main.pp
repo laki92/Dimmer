@@ -34,6 +34,7 @@ main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/rom_patch.h
 main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/prcm.h
 main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/gpio.h
 main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/timer.h
+main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/adc.h
 main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/gpio_if.h
 main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/uart_if.h
 main.obj: C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/common.h
@@ -42,6 +43,7 @@ main.obj: ../smartconfig.h
 main.obj: ../pinmux.h
 main.obj: ../pwm.h
 main.obj: ../flash.h
+main.obj: ../ADC_my.h
 
 ../main.c: 
 C:/TI/ccsv6/tools/compiler/ti-cgt-arm_5.2.4/include/string.h: 
@@ -77,6 +79,7 @@ C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/rom_patch.h:
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/prcm.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/gpio.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/timer.h: 
+C:/TI/CC3200SDK_1.1.0/cc3200-sdk/driverlib/adc.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/gpio_if.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/uart_if.h: 
 C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/common.h: 
@@ -85,3 +88,4 @@ C:/TI/CC3200SDK_1.1.0/cc3200-sdk/example/common/timer_if.h:
 ../pinmux.h: 
 ../pwm.h: 
 ../flash.h: 
+../ADC_my.h: 

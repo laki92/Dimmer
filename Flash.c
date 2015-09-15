@@ -22,8 +22,6 @@
 
 #define SL_MAX_FILE_SIZE        64L*1024L       /* 64KB file */
 #define BUF_SIZE                2048
-#define USER_FILE_NAME          "state.txt"
-
 /* Application specific status/error codes */
 typedef enum{
     // Choosing this number to avoid overlap w/ host-driver's error codes
@@ -44,24 +42,25 @@ SlFsFileInfo_t info;
 //*****************************************************************************
 unsigned char gaucCmpBuf[4];
 
-long CreateFileToDevice(long *lFileHandle)
+long CreateFileToDevice(char *Name)
 {
+	long lFileHandle=-1;
     long lRetVal = -1;
 
     //
     //  create a user file
     //
 
-    lRetVal = sl_FsOpen((unsigned char *)USER_FILE_NAME,
+    lRetVal = sl_FsOpen((unsigned char *)Name,
     					FS_MODE_OPEN_CREATE(3584, _FS_FILE_OPEN_FLAG_COMMIT|_FS_FILE_PUBLIC_WRITE),
                         NULL,
-                        lFileHandle);
+                        &lFileHandle);
     if(lRetVal < 0)
     {
         //
         // File may already be created
         //
-        lRetVal = sl_FsClose(*lFileHandle, 0, 0, 0);
+        lRetVal = sl_FsClose(lFileHandle, 0, 0, 0);
         ASSERT_ON_ERROR(lRetVal);
     }
     else
@@ -69,7 +68,7 @@ long CreateFileToDevice(long *lFileHandle)
         //
         // close the user file
         //
-        lRetVal = sl_FsClose(*lFileHandle, 0, 0, 0);
+        lRetVal = sl_FsClose(lFileHandle, 0, 0, 0);
         if (SL_RET_CODE_OK != lRetVal)
         {
             ASSERT_ON_ERROR(FILE_CLOSE_ERROR);
@@ -79,29 +78,29 @@ long CreateFileToDevice(long *lFileHandle)
 }
 
 
-long WriteFileToDevice(long *lFileHandle, char *Data)
+long WriteFileToDevice(char *Name, char *Data)
 {
-  //  int iLoopCnt = 0;
+  	long lFileHandle=-1;
     long lRetVal = -1;
 	//
 	//  open a user file for writing
 	//
-	lRetVal = sl_FsOpen((unsigned char *)USER_FILE_NAME,
+	lRetVal = sl_FsOpen((unsigned char *)Name,
 						FS_MODE_OPEN_WRITE,
 						NULL,
-						lFileHandle);
+						&lFileHandle);
 	if(lRetVal < 0)
 	{
-		lRetVal = sl_FsClose(*lFileHandle, 0, 0, 0);
+		lRetVal = sl_FsClose(lFileHandle, 0, 0, 0);
 		ASSERT_ON_ERROR(FILE_OPEN_WRITE_FAILED);
 	}
 
 
-	lRetVal = sl_FsWrite(*lFileHandle, 0,
-				(unsigned char *)Data, sizeof(Data));
+	lRetVal = sl_FsWrite(lFileHandle, 0,
+				(unsigned char *)Data, strlen(Data));
 	if (lRetVal < 0)
 	{
-		lRetVal = sl_FsClose(*lFileHandle, 0, 0, 0);
+		lRetVal = sl_FsClose(lFileHandle, 0, 0, 0);
 			ASSERT_ON_ERROR(FILE_WRITE_FAILED);
 	}
 
@@ -109,7 +108,7 @@ long WriteFileToDevice(long *lFileHandle, char *Data)
 	//
 	// close the user file
 	//
-	lRetVal = sl_FsClose(*lFileHandle, 0, 0, 0);
+	lRetVal = sl_FsClose(lFileHandle, 0, 0, 0);
 	if (SL_RET_CODE_OK != lRetVal)
 	{
 		ASSERT_ON_ERROR(FILE_CLOSE_ERROR);
@@ -132,15 +131,15 @@ long WriteFileToDevice(long *lFileHandle, char *Data)
 //!  /return 0: success, -ve:failure
 //
 //*****************************************************************************
-long ReadFileFromDevice(long lFileHandle, int size, unsigned char *data)
+long ReadFileFromDevice(char *Name, unsigned char *data)
 {
+	long lFileHandle= -1;
     long lRetVal = -1;
-    //char *ReadBuffer2="8965";
 
     //
     // open a user file for reading
     //
-    lRetVal = sl_FsOpen((unsigned char *)USER_FILE_NAME,
+    lRetVal = sl_FsOpen((unsigned char *)Name,
                         FS_MODE_OPEN_READ,
                         NULL,
                         &lFileHandle);
@@ -152,7 +151,7 @@ long ReadFileFromDevice(long lFileHandle, int size, unsigned char *data)
 
     // get lenght of requred data
 
-   /* lRetVal=sl_FsGetInfo((unsigned char*)&lFileHandle,
+    lRetVal=sl_FsGetInfo((unsigned char*)Name,
     		NULL,
 			&info);
     if(lRetVal < 0)
@@ -160,26 +159,19 @@ long ReadFileFromDevice(long lFileHandle, int size, unsigned char *data)
             UART_PRINT("ERROR sl_FsGetInfo");
         }
 
-       */
     //
     // read the data and compare with the stored buffer
     //
 
 	lRetVal = sl_FsRead(lFileHandle, 0,
-			(unsigned char*)gaucCmpBuf, size);
-	if ((lRetVal < 0) || (lRetVal != size))
+			data,
+			info.FileLen);
+	if ((lRetVal < 0) || (lRetVal != info.FileLen))
 	{
 		lRetVal = sl_FsClose(lFileHandle, 0, 0, 0);
 		ASSERT_ON_ERROR(FILE_READ_FAILED);
 	}
 
-	UART_PRINT("ReadBuffer %s",gaucCmpBuf);
-
-	data=gaucCmpBuf;
-
-
-
-	UART_PRINT("DataBuffer %s", data);
     //
     // close the user file
     //

@@ -75,6 +75,7 @@
 #include "prcm.h"
 #include "gpio.h"
 #include "timer.h"
+#include "adc.h"
 
 //Free_rtos/ti-rtos includes
 #include "osi.h"
@@ -90,6 +91,7 @@
 
 #include "pwm.h"
 #include "flash.h"
+#include "ADC_my.h"
 #define APPLICATION_NAME        "HTTP Server"
 #define APPLICATION_VERSION     "1.1.1"
 #define AP_SSID_LEN_MAX         (33)
@@ -108,6 +110,7 @@
 #define setCOLOR				1
 #define DebounceTimeT1			2
 #define DebounceTimeT2			10
+#define USER_FILE_NAME          "state.txt"
 
 #define OOB_TASK_PRIORITY               (1)
 #define OSI_STACK_SIZE                  (2048)
@@ -163,6 +166,7 @@ int	 RedMove;
 int  GreenMove;
 int  BlueMove;
 int	 IntTransient;
+
 
 long lFileHandle;
 unsigned long ulToken;
@@ -538,6 +542,20 @@ void SimpleLinkSockEventHandler(SlSockEvent_t *pSock) {
 	// This application doesn't work w/ socket - Events are not expected
 	//
 
+}
+
+//*****************************************************************************
+//Overvoltage Callback
+//This function disable all PWMs
+
+//*****************************************************************************
+void Overvoltage (){
+
+	PWM_Disable_1();
+	PWM_Disable_2();
+	PWM_Disable_3();
+
+	UART_PRINT("Overcurrent disable all PWMs");
 }
 
 //*****************************************************************************
@@ -961,10 +979,8 @@ static void ReadDeviceConfiguration() {
 //****************************************************************************
 static void HTTPServerTask(void *pvParameters) {
 
-	//char ReConn[MSG_CONNECTION_LENGHT]="1";
-	//char *Command="1234";
-//	unsigned char Command2[4];
-	//int size;
+	unsigned char StartCommand[MAX_MSG_LENGTH];
+//	char *pom="BLINKY";
 
 	while(1)
 	{
@@ -1016,26 +1032,25 @@ static void HTTPServerTask(void *pvParameters) {
 			;
 		}
 /*
-		lRetVal=CreateFileToDevice(&lFileHandle); //Alocate memory on flash
+		lRetVal=CreateFileToDevice(USER_FILE_NAME); //Alocate memory on flash
 		if (lRetVal < 0) {
 			ERR_PRINT(lRetVal);
-			}
-		//ReadFileFromDevice(ulToken, lFileHandle, Command);
-		//lRetVal=WriteFileToDevice(&lFileHandle, (long *)Command);
-		if (lRetVal < 0) {
-			ERR_PRINT(lRetVal);
-			}
-		size= sizeof(Command);
-		lRetVal=ReadFileFromDevice(lFileHandle,
-				size,
-				Command2);
-		if (lRetVal < 0) {
-			ERR_PRINT(lRetVal);
-			}
-		//Timer_IF_Stop(ul_TimerA2Base, TIMER_A);
-		UART_PRINT("Command2 \n\r", Command2);
+		}
 */
-		UART_PRINT("CALLBACK WHILE");
+
+
+
+
+		lRetVal=ReadFileFromDevice(USER_FILE_NAME, StartCommand);
+		if (lRetVal < 0) {
+			ERR_PRINT(lRetVal);
+		}
+
+		UART_PRINT("Start command %s\n\r", StartCommand);
+		osi_MsgQWrite(&MsgQCommands, StartCommand, OSI_NO_WAIT);
+
+
+
 
 		sl_SyncObjWait(&ConnectSync, OSI_WAIT_FOREVER);
 
@@ -1044,6 +1059,7 @@ static void HTTPServerTask(void *pvParameters) {
 
 void LightControlTask(void *pvParameters)
 {
+	long lRetVal=-1;
 	char Command[MAX_MSG_LENGTH];
 	char *Red;
 	char *Green;
@@ -1061,6 +1077,10 @@ void LightControlTask(void *pvParameters)
 		if(memcmp(Command, BLINKY_MES, strlen((const char *)BLINKY_MES)) == 0)
 		{
 			Timer_IF_Start(ul_TIMERA1Base, TIMER_A, 500);
+			lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)BLINKY_MES);
+			if (lRetVal < 0) {
+				ERR_PRINT(lRetVal);
+			}
 
 		}
 
@@ -1080,7 +1100,11 @@ void LightControlTask(void *pvParameters)
 			}
 			else
 			{
-				//WriteFileToDevice(&ulToken, &lFileHandle, (long *)Command);
+				lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)Command);
+				if (lRetVal < 0) {
+					ERR_PRINT(lRetVal);
+				}
+
 
 				Transient=&Command[24];
 				Transient[3]='\0';
@@ -1119,58 +1143,25 @@ void LightControlTask(void *pvParameters)
 
 void TasterTask (void *pvParameters)
 {
-	char TasterNumber;
-	char DebTast1=0;
+	char DebTast1 = 0;
 	char DebTast2=0;
 	char mode=0;
 
-	while(1)
-	{
-		if(sl_SyncObjWait(&Tast1, OSI_NO_WAIT) == 0)
-		{
-			UART_PRINT("Tast 1 active");
-			TasterNumber=1;
-		}
 
-		if(sl_SyncObjWait(&Tast2, OSI_NO_WAIT) == 0)
-		{
-			UART_PRINT("Tast2 active");
-			TasterNumber=2;
-		}
-
-		if(TasterNumber==1)
-		{
-			if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_4)==0)
-				DebTast1++;
-			else
-			{
-				DebTast1=0;
-				MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_4);
-				TasterNumber=0;
-			}
-			if(DebTast1==DebounceTimeT1)
+	while(1){
+		//Taster1 rutine
+		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_4)==0) {
+			if(DebTast1++ == DebounceTimeT1)
 			{
 				sl_SyncObjSignal(&ConnectSync);
-				//osi_MsgQWrite(&MsgQConnection, "2", OSI_NO_WAIT);
-				DebTast1=0;
-				TasterNumber=0;
-				MAP_GPIOIntEnable(GPIOA0_BASE, GPIO_PIN_7);
 			}
-
 		}
-		if(TasterNumber==2)
-		{
-			if(GPIOPinRead(GPIOA0_BASE, GPIO_PIN_7)==0)
-				DebTast2++;
-			else
-			{
-				DebTast2=0;
-				MAP_GPIOIntEnable(GPIOA0_BASE, GPIO_PIN_7);
-			}
-			if(DebTast2==DebounceTimeT2)
-			{
-				switch(mode)
-					 {
+		else
+			DebTast1=0;
+		//Taster 2 rutine
+		if(GPIOPinRead(GPIOA0_BASE, GPIO_PIN_7)==0){
+			if(DebTast2++ == DebounceTimeT2){
+				switch(mode){
 					 case blink:{
 						 mode=setCOLOR;
 						 UART_PRINT("BLINK MODE to COLOR \n\r");
@@ -1185,78 +1176,34 @@ void TasterTask (void *pvParameters)
 						 }
 					 }
 			}
-		}
-		/*//Pwm1 overcurrent
-		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)){
+		}else
+			DebTast2=0;
+
+
+		//Pwm1 overcurrent
+		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)==0){
 			PWM_Disable_1();
 			UART_PRINT("Overcurrent CH1 \n\r");
 			MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_1);
 			MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_1);
 		}
 		//Pwm2 overcurrent
-		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)){
+		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)==0){
 
 		}
 		//Pwm3 overcurrent
-		if(GPIOPinRead(GPIOA1_BASE, GPIO_PIN_7)){
+		if(GPIOPinRead(GPIOA1_BASE, GPIO_PIN_7)==0){
 			PWM_Disable_3();
 			UART_PRINT("Overcurrent CH3\n\r");
 			MAP_GPIOIntClear(GPIOA1_BASE, GPIO_PIN_7);
 			MAP_GPIOIntEnable(GPIOA1_BASE, GPIO_PIN_7);
 		}
-		*/
+
 
 		osi_Sleep(100);
 	}
 }
 
-//
-//Interrupt rutine for GPIO28
-//
- void Taster1()
- {
-	UART_PRINT("botton1 \n\r");
-	osi_SyncObjSignalFromISR(&Tast1);
-	MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_4);
-	MAP_GPIOIntDisable(GPIOA3_BASE, GPIO_PIN_4);
-}
-//
-//Ineterrupt rutine for GPIO7
-//
- void Taster2()
- {
-	 UART_PRINT("botton2 \n\r");
-	 osi_SyncObjSignalFromISR(&Tast2);
-	//Reincialize of innterrupt
-	 MAP_GPIOIntClear(GPIOA0_BASE, GPIO_PIN_7);
-	 MAP_GPIOIntDisable(GPIOA0_BASE, GPIO_PIN_7);
-}
-//Interrupt rutine for overcurent PWM1
-/*void TrunOffPWM1()
-{
-	PWM_Disable_1();
-	UART_PRINT("Overcurrent CH1 \n\r");
-	MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_1);
-	MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_1);
-}
-*/
-//Interrupt rutine for overcurent PWM2
-
-/*void TrunOffPWM2()
-{
-	PWM_Disable_2();
-	UART_PRINT("Overcurrent CH2");
-	MAP_GPIOIntClear(GPIOA0_BASE, 1);
-	MAP_GPIOIntEnable(GPIOA0_BASE, 1);
-}
-
-//Interrupt rutine for overcurent PWM3
-*/
-/*void TrunOffPWM3()
-{
-
-}
-*/
 void Bliky()
 {
 	pom^=1;
@@ -1298,13 +1245,6 @@ void MoveMode()
 		Timer_IF_Stop(ul_TIMERA0Base,TIMER_A);
 }
 
-void BlinkyConfig()
-{
-	//Timer_IF_InterruptClear(ul_TimerA2Base);
-
-	UART_PRINT("blinky");
-
-}
 //*****************************************************************************
 //
 //! Application startup display on UART
@@ -1329,37 +1269,34 @@ static void DisplayBanner(char * AppName) {
 
 static void TimerInterruptInit(void) {
 
-	//UART_PRINT("Initialization timer");
 	//
 	// Base address for timer
 	//
 	ul_TIMERA0Base = TIMERA0_BASE;
 	ul_TIMERA1Base = TIMERA1_BASE;
-	//ul_TimerA2Base = TIMERA2_BASE;
 
 	//
 	// Configuring the timers
 	//
 	Timer_IF_Init(PRCM_TIMERA0, ul_TIMERA0Base, TIMER_CFG_PERIODIC, TIMER_A, 0);
 	Timer_IF_Init(PRCM_TIMERA1, ul_TIMERA1Base, TIMER_CFG_PERIODIC, TIMER_A, 0);
-	//Timer_IF_Init(PRCM_TIMERA2, ul_TimerA2Base, TIMER_CFG_PERIODIC, TIMER_A, 0);
 
 	//
 	// Setup the interrupts for the timer timeouts.
 	//
 	Timer_IF_IntSetup(ul_TIMERA0Base, TIMER_A, MoveMode);
 	Timer_IF_IntSetup(ul_TIMERA1Base, TIMER_A, Bliky);
-	//Timer_IF_IntSetup(ul_TimerA2Base, TIMER_A, BlinkyConfig);
-
-	//
-	// Turn on the timers feeding values in mSec
-	//
-	//Timer_IF_Start(ul_TIMERA0Base, TIMER_A, 500);
-	//Timer_IF_Start(ul_TIMERA1Base, TIMER_A, 500);
 
 	//
 	// Loop forever while the timers run.
 	//
+}
+
+static void ADCInit(void){
+
+	ADCChannelEnable(ADC_BASE, ADC_CH_3);
+
+	ADCEnable(ADC_BASE);
 }
 
 
@@ -1412,21 +1349,12 @@ void main() {
 	//Timer interrupt initialization
     TimerInterruptInit();
 
+	// Inicialize ADC
+    ADCInit();
+
 	//Change Pin 58 Configuration from Default to Pull Down
 	MAP_PinConfigSet(PIN_58, PIN_STRENGTH_2MA | PIN_STRENGTH_4MA,
 			PIN_TYPE_STD_PD);
-
-	// Inicialize GPIO input interrupt
-	GPIO_IF_ConfigureNIntEnable(GPIOA3_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE, Taster1);
-	GPIO_IF_ConfigureNIntEnable(GPIOA0_BASE, GPIO_PIN_7, GPIO_LOW_LEVEL, Taster2);
-
-
-	//GPIO_IF_ConfigureNIntEnable(GPIOA3_BASE, GPIO_PIN_1, GPIO_FALLING_EDGE, TrunOffPWM1);
-	//GPIO_IF_ConfigureNIntEnable(GPIOA0_BASE, 1, GPIO_FALLING_EDGE, TrunOffPWM2);
-	//GPIO_IF_ConfigureNIntEnable(GPIOA1_BASE, GPIO_PIN_7, GPIO_FALLING_EDGE, TrunOffPWM3);
-
-	//GPIO_IF_ConfigureNIntEnable(GPIOA1_BASE, 14, GPIO_FALLING_EDGE, TasterGpio7);
-
 
 	//UART Initialization
 	MAP_PRCMPeripheralReset(PRCM_UARTA0);
@@ -1455,7 +1383,6 @@ void main() {
 		LOOP_FOREVER();
 	}
 	//
-
 	// Create Light Control Task
 	//
 	lRetVal = osi_TaskCreate(LightControlTask, (signed char*)"LightControlTask", OSI_STACK_SIZE, NULL, OOB_TASK_PRIORITY, NULL);

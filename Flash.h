@@ -8,9 +8,9 @@
 #ifndef FLASH_H_
 #define FLASH_H_
 
-long CreateFileToDevice(long *lFileHandle);
-long WriteFileToDevice(long *lFileHandle, long *data);
-long ReadFileFromDevice(long , int size,unsigned char *data);
+long CreateFileToDevice(char *Name);
+long WriteFileToDevice(char *Name, long *data);
+long ReadFileFromDevice(char *Name,unsigned char *data);
 
 
 
