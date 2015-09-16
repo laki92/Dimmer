@@ -166,6 +166,7 @@ int	 RedMove;
 int  GreenMove;
 int  BlueMove;
 int	 IntTransient;
+char Status[MAX_MSG_LENGTH];
 
 
 long lFileHandle;
@@ -585,54 +586,19 @@ void SimpleLinkHttpServerCallback(SlHttpServerEvent_t *pSlHttpServerEvent,
 	    {
 	        case SL_NETAPP_HTTPGETTOKENVALUE_EVENT:
 	        {
-	          unsigned char status, *ptr;
+			  unsigned char *ptr;
 
-	          ptr = pSlHttpServerResponse->ResponseData.token_value.data;
-	          pSlHttpServerResponse->ResponseData.token_value.len = 0;
-	          if(memcmp(pSlHttpServerEvent->EventData.httpTokenName.data, GET_token, //ako je ovo sto je prosledjeno jednako onom sto mi treba ovo djubre vraca 0
-	                    strlen((const char *)GET_token)) == 0)
-	          {
-	            status = GPIO_IF_LedStatus(MCU_RED_LED_GPIO); //status crvene diode
-	            strLenVal = strlen(LED1_STRING);//
-	            memcpy(ptr, LED1_STRING, strLenVal); // kopiram led1 na ptr sto ide na http
-	            ptr += strLenVal; // pomeram pokazicvac na zadnji karakter stringa
-	            pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
-	            if(status & 0x01)
-	            {
-	              strLenVal = strlen(LED_ON_STRING); // ispise led pa njegovu vrednost pa vrati na http
-	              memcpy(ptr, LED_ON_STRING, strLenVal);
-	              ptr += strLenVal;
-	              pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
-	            }
-	            else
-	            {
-	              strLenVal = strlen(LED_OFF_STRING); //isto samo za kontra vrednost
-	              memcpy(ptr, LED_OFF_STRING, strLenVal);
-	              ptr += strLenVal;
-	              pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
-	            }
-	            status = GPIO_IF_LedStatus(MCU_GREEN_LED_GPIO);
-	            strLenVal = strlen(LED2_STRING);
-	            memcpy(ptr, LED2_STRING, strLenVal);
-	            ptr += strLenVal;
-	            pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
-	            if(status & 0x01)
-	            {
-	              strLenVal = strlen(LED_ON_STRING);
-	              memcpy(ptr, LED_ON_STRING, strLenVal);
-	              ptr += strLenVal;
-	              pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
-	            }
-	            else
-	            {
-	              strLenVal = strlen(LED_OFF_STRING);
-	              memcpy(ptr, LED_OFF_STRING, strLenVal);
-	              ptr += strLenVal;
-	              pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
-	            }
-	            *ptr = '\0';
-	          }
 
+			  ptr =pSlHttpServerResponse->ResponseData.token_value.data;
+			  pSlHttpServerResponse->ResponseData.token_value.len = 0;
+			  if(memcmp(pSlHttpServerEvent->EventData.httpTokenName.data, GET_token,
+									strlen((const char *)GET_token)) == 0){
+				  strLenVal = strlen(Status);
+				  memcpy(ptr, Status, strLenVal);
+				  pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
+				  *ptr = '\0';
+
+				  }
 	        }
 	        break;
 
@@ -980,7 +946,7 @@ static void ReadDeviceConfiguration() {
 static void HTTPServerTask(void *pvParameters) {
 
 	unsigned char StartCommand[MAX_MSG_LENGTH];
-//	char *pom="BLINKY";
+	unsigned long pom=0;
 
 	while(1)
 	{
@@ -1037,10 +1003,6 @@ static void HTTPServerTask(void *pvParameters) {
 			ERR_PRINT(lRetVal);
 		}
 */
-
-
-
-
 		lRetVal=ReadFileFromDevice(USER_FILE_NAME, StartCommand);
 		if (lRetVal < 0) {
 			ERR_PRINT(lRetVal);
@@ -1049,7 +1011,8 @@ static void HTTPServerTask(void *pvParameters) {
 		UART_PRINT("Start command %s\n\r", StartCommand);
 		osi_MsgQWrite(&MsgQCommands, StartCommand, OSI_NO_WAIT);
 
-
+		ReadADC3(&pom);
+		UART_PRINT("pom %d",pom);
 
 
 		sl_SyncObjWait(&ConnectSync, OSI_WAIT_FOREVER);
@@ -1065,6 +1028,7 @@ void LightControlTask(void *pvParameters)
 	char *Green;
 	char *Blue;
 	char *Transient;
+	char StatusTemp[MAX_MSG_LENGTH];
 
 	while(1)
 	{
@@ -1076,6 +1040,8 @@ void LightControlTask(void *pvParameters)
 
 		if(memcmp(Command, BLINKY_MES, strlen((const char *)BLINKY_MES)) == 0)
 		{
+			memcpy(Status, "BLINKY", strlen("BLINKY")); //Sluzi da se zna u kom je stanju sistem zbog get komande
+
 			Timer_IF_Start(ul_TIMERA1Base, TIMER_A, 500);
 			lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)BLINKY_MES);
 			if (lRetVal < 0) {
@@ -1092,19 +1058,24 @@ void LightControlTask(void *pvParameters)
 
 			UART_PRINT("Command = %s \n\r",&Command[15]);
 
-			if(memcmp(&Command[15], CHANGE_MODE_STR, strlen(CHANGE_MODE_STR)) == 0 )
-			{
+			if(memcmp(&Command[15], CHANGE_MODE_STR, strlen(CHANGE_MODE_STR)) == 0 ){
+
+				memcpy(Status, StatusTemp, strlen(StatusTemp));
+
+
 				PWM_Set1(RedOld);
 				PWM_Set2(GreenOld);
 				PWM_Set2(BlueOld);
 			}
-			else
-			{
+			else{
+
 				lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)Command);
 				if (lRetVal < 0) {
 					ERR_PRINT(lRetVal);
 				}
 
+				memcpy(Status, &Command[10], strlen(Command)-10);
+				memcpy(StatusTemp, &Command[10], strlen(Command)-10);
 
 				Transient=&Command[24];
 				Transient[3]='\0';
@@ -1181,22 +1152,20 @@ void TasterTask (void *pvParameters)
 
 
 		//Pwm1 overcurrent
-		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)==0){
+		if(GPIOPinRead(GPIOA1_BASE, GPIO_PIN_7)==0){
 			PWM_Disable_1();
 			UART_PRINT("Overcurrent CH1 \n\r");
-			MAP_GPIOIntClear(GPIOA3_BASE, GPIO_PIN_1);
-			MAP_GPIOIntEnable(GPIOA3_BASE, GPIO_PIN_1);
 		}
 		//Pwm2 overcurrent
 		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)==0){
+			PWM_Disable_2();
+			UART_PRINT("Overcurrent CH2 \n\r");
 
 		}
 		//Pwm3 overcurrent
-		if(GPIOPinRead(GPIOA1_BASE, GPIO_PIN_7)==0){
+		if(GPIOPinRead(GPIOA2_BASE, GPIO_PIN_0)==0){
 			PWM_Disable_3();
 			UART_PRINT("Overcurrent CH3\n\r");
-			MAP_GPIOIntClear(GPIOA1_BASE, GPIO_PIN_7);
-			MAP_GPIOIntEnable(GPIOA1_BASE, GPIO_PIN_7);
 		}
 
 

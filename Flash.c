@@ -42,6 +42,9 @@ SlFsFileInfo_t info;
 //*****************************************************************************
 unsigned char gaucCmpBuf[4];
 
+/******************************************************************************/
+//				Create file file name in external Flash memory
+/******************************************************************************/
 long CreateFileToDevice(char *Name)
 {
 	long lFileHandle=-1;
@@ -77,6 +80,9 @@ long CreateFileToDevice(char *Name)
     return SUCCESS;
 }
 
+/******************************************************************************/
+//				Write data in external Flash memory with File name
+/******************************************************************************/
 
 long WriteFileToDevice(char *Name, char *Data)
 {
@@ -118,19 +124,10 @@ long WriteFileToDevice(char *Name, char *Data)
 }
 
 
-//*****************************************************************************
-//
-//!  This funtion includes the following steps:
-//!    -open the user file for reading
-//!    -read the data and compare with the stored buffer
-//!    -close the user file
-//!
-//!  /param[in] ulToken : file token
-//!  /param[in] lFileHandle : file handle
-//!
-//!  /return 0: success, -ve:failure
-//
-//*****************************************************************************
+/******************************************************************************/
+//				Read from external Flash memory with file name
+/******************************************************************************/
+
 long ReadFileFromDevice(char *Name, unsigned char *data)
 {
 	long lFileHandle= -1;

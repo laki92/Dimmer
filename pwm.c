@@ -32,7 +32,7 @@ void SetupTimerPWMMode(unsigned long ulBase, unsigned long ulTimer,
     //
     // Load value set to ~0.5 ms time period
     //
-    MAP_TimerLoadSet(ulBase,ulTimer, temp); // 100Hz
+    MAP_TimerLoadSet(ulBase,ulTimer, temp);
     
     //
     // Match value set so as to output level 0
@@ -57,9 +57,9 @@ unsigned char PWM_Init(unsigned int fpwm)
 	SetupTimerPWMMode(TIMERA3_BASE, TIMER_A,
 			  (TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PWM | TIMER_CFG_B_PWM), 1, fpwm);
 
-	MAP_TimerEnable(TIMERA2_BASE, TIMER_B);// RED
-	MAP_TimerEnable(TIMERA3_BASE, TIMER_A);// GREEN
-	MAP_TimerEnable(TIMERA3_BASE, TIMER_B);// BLUE
+	MAP_TimerEnable(TIMERA2_BASE, TIMER_B);
+	MAP_TimerEnable(TIMERA3_BASE, TIMER_A);
+	MAP_TimerEnable(TIMERA3_BASE, TIMER_B);
 
 
     return 0;
@@ -68,20 +68,26 @@ unsigned char PWM_Init(unsigned int fpwm)
 void PWM_Disable_1()
 {
 	TimerDisable(TIMERA3_BASE, TIMER_A);
-	GPIOPinWrite(GPIOA3_BASE, GPIO_PIN_1, GPIO_PIN_1);
+	PinTypeGPIO(PIN_01, PIN_MODE_0, false);
+	GPIODirModeSet(GPIOA1_BASE, GPIO_PIN_2, GPIO_DIR_MODE_OUT);
+	GPIOPinWrite(GPIOA1_BASE, GPIO_PIN_2, GPIO_PIN_2);
 
 }
 
 void PWM_Disable_2()
 {
-	//TimerDisable(TIMERA3_BASE, TIMER_B);
-	//GPIOPinWrite(GPIOA3_BASE, GPIO_PIN_1, GPIO_PIN_1);
+	TimerDisable(TIMERA3_BASE, TIMER_B);
+	PinTypeGPIO(PIN_02, PIN_MODE_0, false);
+	GPIODirModeSet(GPIOA1_BASE, GPIO_PIN_3, GPIO_DIR_MODE_OUT);
+	GPIOPinWrite(GPIOA1_BASE, GPIO_PIN_3, GPIO_PIN_3);
 }
 
 void PWM_Disable_3()
 {
 	TimerDisable(TIMERA2_BASE, TIMER_B);
-	GPIOPinWrite(GPIOA1_BASE, GPIO_PIN_7, GPIO_PIN_7);
+	PinTypeGPIO(PIN_64, PIN_MODE_0, false);
+	GPIODirModeSet(GPIOA1_BASE, GPIO_PIN_1, GPIO_DIR_MODE_OUT);
+	GPIOPinWrite(GPIOA1_BASE, GPIO_PIN_1, GPIO_PIN_1);
 
 }
 
@@ -113,26 +119,3 @@ void PWM_Set3(char temp)
 		temp=0;
     TimerMatchSet(TIMERA3_BASE, TIMER_B, temp*((8000-1)/100));
 }
-
-/*void PWM_Set(double temp)
-{
- //   double b = (temp > 0.5) ? (1 - 0.75 * temp) : 0.75 * temp;
- //   TimerMatchSet(TIMERA2_BASE, TIMER_B, temp * 53000); //RED
- //   TimerMatchSet(TIMERA3_BASE, TIMER_A, (1 - temp) * 53000); // GREEN
- //   TimerMatchSet(TIMERA3_BASE, TIMER_B, b* 53000);
-
-
-    if(temp < 0.5)
-    {
-        TimerMatchSet(TIMERA2_BASE, TIMER_B, 0);
-        TimerMatchSet(TIMERA3_BASE, TIMER_A, (0.5 - temp) * 2 * 53300);
-        TimerMatchSet(TIMERA3_BASE, TIMER_B, temp * 53300);
-    }
-    else
-    {
-        TimerMatchSet(TIMERA2_BASE, TIMER_B, (temp - 0.5) * 2 * 53300);
-        TimerMatchSet(TIMERA3_BASE, TIMER_A, 0);
-        TimerMatchSet(TIMERA3_BASE, TIMER_B, (1 - temp) * 53300);
-    }
-}
-*/

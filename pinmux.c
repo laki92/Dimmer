@@ -79,24 +79,24 @@ PinMuxConfig(void)
 
     /**************************************************/
     //Pwm overcurrent
-/*
+
     //
-	// Configure PIN_55 for GPIO Input GPIO1 (PWM2)
+	// Configure PIN_07 for GPIO Input(PWM3)
 	//
-	MAP_PinTypeGPIO(PIN_55, PIN_MODE_0, false);
-	MAP_GPIODirModeSet(GPIOA0_BASE, 0x2, GPIO_DIR_MODE_IN);
-*/
+	MAP_PinTypeGPIO(PIN_07, PIN_MODE_0, false);
+	MAP_GPIODirModeSet(GPIOA2_BASE, 0x1, GPIO_DIR_MODE_IN);
+
 	//
-	// Configure PIN_06 for GPIO Input GPIO15 (PWM3)
+	// Configure PIN_06 for GPIO Input GPIO15 (PWM1)
 	//
 	MAP_PinTypeGPIO(PIN_06, PIN_MODE_0, false);
 	MAP_GPIODirModeSet(GPIOA1_BASE, 0x80, GPIO_DIR_MODE_IN);
 
 	//
-	// Configure PIN_21 for GPIO Input GPIO25 (PWM1)
+	// Configure PIN_21 for GPIO Input GPIO25 (PWM2)
 	//
-	MAP_PinTypeGPIO(PIN_21, PIN_MODE_0, false);
-	MAP_GPIODirModeSet(GPIOA3_BASE, 0x2, GPIO_DIR_MODE_IN);
+    MAP_PinTypeGPIO(PIN_21, PIN_MODE_0, false);
+    MAP_GPIODirModeSet(GPIOA3_BASE, 0x2, GPIO_DIR_MODE_IN);
 
     /**************************************************/
     //Taster
