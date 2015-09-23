@@ -156,17 +156,18 @@ extern void (* const g_pfnVectors[])(void);
 extern uVectorEntry __vector_table;
 #endif
 
-char conf=1;
-char mode=blink;
-char pom=0;
-char RedOld=0;
-char GreenOld=0;
-char BlueOld=0;
-int	 RedMove;
-int  GreenMove;
-int  BlueMove;
-int	 IntTransient;
-char Status[MAX_MSG_LENGTH];
+
+char g_mode=blink;
+char g_Toggle=0;
+char g_RedOld=0;
+char g_GreenOld=0;
+char g_BlueOld=0;
+int	 g_RedMove;
+int  g_GreenMove;
+int  g_BlueMove;
+int	 g_IntTransient;
+char g_Status[MAX_MSG_LENGTH];
+char g_StatusColor[MAX_MSG_LENGTH];
 
 
 long lFileHandle;
@@ -546,20 +547,6 @@ void SimpleLinkSockEventHandler(SlSockEvent_t *pSock) {
 }
 
 //*****************************************************************************
-//Overvoltage Callback
-//This function disable all PWMs
-
-//*****************************************************************************
-void Overvoltage (){
-
-	PWM_Disable_1();
-	PWM_Disable_2();
-	PWM_Disable_3();
-
-	UART_PRINT("Overcurrent disable all PWMs");
-}
-
-//*****************************************************************************
 //
 //! This function gets triggered when HTTP Server receives Application
 //! defined GET and POST HTTP Tokens.
@@ -573,7 +560,7 @@ void Overvoltage (){
 void SimpleLinkHttpServerCallback(SlHttpServerEvent_t *pSlHttpServerEvent,
 		SlHttpServerResponse_t *pSlHttpServerResponse) {
 
-	UART_PRINT("Http callback in ");
+	UART_PRINT("Http callback in \n\r");
 
 	    unsigned char strLenVal = 0;
 
@@ -593,8 +580,8 @@ void SimpleLinkHttpServerCallback(SlHttpServerEvent_t *pSlHttpServerEvent,
 			  pSlHttpServerResponse->ResponseData.token_value.len = 0;
 			  if(memcmp(pSlHttpServerEvent->EventData.httpTokenName.data, GET_token,
 									strlen((const char *)GET_token)) == 0){
-				  strLenVal = strlen(Status);
-				  memcpy(ptr, Status, strLenVal);
+				  strLenVal = strlen(g_Status);
+				  memcpy(ptr, g_Status, strLenVal);
 				  pSlHttpServerResponse->ResponseData.token_value.len += strLenVal;
 				  *ptr = '\0';
 
@@ -605,9 +592,10 @@ void SimpleLinkHttpServerCallback(SlHttpServerEvent_t *pSlHttpServerEvent,
 	        case SL_NETAPP_HTTPPOSTTOKENVALUE_EVENT:
 	        {
 	        	unsigned char *ptr = pSlHttpServerEvent->EventData.httpPostData.token_name.data;
-	        	UART_PRINT("poslao u qeue %s",ptr);
+	        	ptr[27]='\0';
 	        	/* Queue a message for the print task to display on the UART CONSOLE. */
 	        	osi_MsgQWrite(&MsgQCommands, ptr, OSI_NO_WAIT);
+	        	UART_PRINT("poslao u qeue %s\n\r",ptr);
 	        }
 	        default:
 	          break;
@@ -946,7 +934,7 @@ static void ReadDeviceConfiguration() {
 static void HTTPServerTask(void *pvParameters) {
 
 	unsigned char StartCommand[MAX_MSG_LENGTH];
-	unsigned long pom=0;
+	unsigned long InputVoltage=0;
 
 	while(1)
 	{
@@ -963,6 +951,7 @@ static void HTTPServerTask(void *pvParameters) {
 		// Note that all profiles and persistent settings that were done on the
 		// device will be lost
 		//
+
 		lRetVal = ConfigureSimpleLinkToDefaultState();
 		if (lRetVal < 0) {
 			if (DEVICE_NOT_IN_STATION_MODE == lRetVal)
@@ -1008,12 +997,20 @@ static void HTTPServerTask(void *pvParameters) {
 			ERR_PRINT(lRetVal);
 		}
 
-		UART_PRINT("Start command %s\n\r", StartCommand);
+
 		osi_MsgQWrite(&MsgQCommands, StartCommand, OSI_NO_WAIT);
+		if(lRetVal==0)
+			UART_PRINT("Start command %s\n\r", StartCommand);
 
-		ReadADC3(&pom);
-		UART_PRINT("pom %d",pom);
+		ReadADC3(&InputVoltage);
+		UART_PRINT("InputVoltage %d",InputVoltage);
 
+/*		if(InputVoltage>=4000){
+			PWM_Disable_1();
+			PWM_Disable_2();
+			PWM_Disable_3();
+		}
+*/
 
 		sl_SyncObjWait(&ConnectSync, OSI_WAIT_FOREVER);
 
@@ -1024,88 +1021,79 @@ void LightControlTask(void *pvParameters)
 {
 	long lRetVal=-1;
 	char Command[MAX_MSG_LENGTH];
-	char *Red;
-	char *Green;
-	char *Blue;
-	char *Transient;
-	char StatusTemp[MAX_MSG_LENGTH];
+	char Red[4];
+	char Green[4];
+	char Blue[4];
+	char Transient[4];
 
 	while(1)
 	{
 
 		/* Wait for a message to arrive. */
 		osi_MsgQRead(&MsgQCommands, Command, OSI_WAIT_FOREVER);
-		UART_PRINT("Dobijeno sa qeue = %s \n\r",Command);
+		if(lRetVal==0)
+			UART_PRINT("Dobijeno sa qeue = %s \n\r",Command);
 
 
 		if(memcmp(Command, BLINKY_MES, strlen((const char *)BLINKY_MES)) == 0)
 		{
-			memcpy(Status, "BLINKY", strlen("BLINKY")); //Sluzi da se zna u kom je stanju sistem zbog get komande
+			g_mode=blink;
+
+			memcpy(g_Status, "BLINKY", strlen("BLINKY")+1);
 
 			Timer_IF_Start(ul_TIMERA1Base, TIMER_A, 500);
+
 			lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)BLINKY_MES);
 			if (lRetVal < 0) {
 				ERR_PRINT(lRetVal);
 			}
-
 		}
 
 		if(memcmp(Command, SET_COLOR, strlen((const char *)SET_COLOR)) == 0 )
 		{
 			UART_PRINT("set color\n\r");
 
+			g_mode=setCOLOR;
+
 			Timer_IF_Stop(ul_TIMERA1Base, TIMER_A);
 
 			UART_PRINT("Command = %s \n\r",&Command[15]);
 
-			if(memcmp(&Command[15], CHANGE_MODE_STR, strlen(CHANGE_MODE_STR)) == 0 ){
 
-				memcpy(Status, StatusTemp, strlen(StatusTemp));
-
-
-				PWM_Set1(RedOld);
-				PWM_Set2(GreenOld);
-				PWM_Set2(BlueOld);
+			lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)Command);
+			if (lRetVal < 0) {
+				ERR_PRINT(lRetVal);
 			}
-			else{
 
-				lRetVal=WriteFileToDevice(USER_FILE_NAME, (long *)Command);
-				if (lRetVal < 0) {
-					ERR_PRINT(lRetVal);
-				}
+			memcpy(g_Status, &Command[10], 18);
+			memcpy(g_StatusColor, Command, 27);
 
-				memcpy(Status, &Command[10], strlen(Command)-10);
-				memcpy(StatusTemp, &Command[10], strlen(Command)-10);
+			memcpy(Transient, &Command[24], 3);
+			Transient[3]='\0';
+			UART_PRINT("Transient %s \n\r",Transient);
+			g_IntTransient=atoi(Transient);
+			if(g_IntTransient<100)
+				g_IntTransient=100;
 
-				Transient=&Command[24];
-				Transient[3]='\0';
-				UART_PRINT("Transient %s \n\r",Transient);
-				IntTransient=atoi(Transient);
+			memcpy(Blue, &Command[21], 3);
+			Blue[3]='\0';
+			UART_PRINT("Blue %s \n\r",Blue);
+			g_BlueMove=((char)atoi(Blue)-g_BlueOld)/(g_IntTransient/100);
+			UART_PRINT("Blue move\r", g_BlueMove);
 
-				Blue=&Command[21];
-				Blue[3]='\0';
-				UART_PRINT("Blue %s \n\r",Blue);
+			memcpy(Green, &Command[18], 3);
+			Green[3]='\0';
+			UART_PRINT("Green %s \n\r",Green);
+			g_GreenMove=((char)atoi(Green)-g_GreenOld)/(g_IntTransient/100);
+			UART_PRINT("Green move %d\r", g_GreenMove);
 
-				BlueMove=((char)atoi(Blue)-BlueOld)/(IntTransient/100);
-				UART_PRINT("Blue move\r", BlueMove);
+			memcpy(Red, &Command[15], 3);
+			Red[3]='\0';
+			UART_PRINT("Red %s \n\r",Red);
+			g_RedMove=((char)atoi(Red)-g_RedOld)/(g_IntTransient/100);
+			UART_PRINT("Red move %d\r", g_RedMove);
 
-
-				Green=&Command[18];
-				Green[3]='\0';
-				UART_PRINT("Green %s \n\r",Green);
-
-				GreenMove=((char)atoi(Green)-GreenOld)/(IntTransient/100);
-				UART_PRINT("Green move %d\r", GreenMove);
-
-				Red=&Command[15];
-				Red[3]='\0';
-				UART_PRINT("Red %s \n\r",Red);
-
-				RedMove=((char)atoi(Red)-RedOld)/(IntTransient/100);
-				UART_PRINT("Red move %d\r", RedMove);
-
-				Timer_IF_Start(ul_TIMERA0Base, TIMER_A, 100);
-			}
+			Timer_IF_Start(ul_TIMERA0Base, TIMER_A, 100);
 		}
 		osi_Sleep(200);
 	}
@@ -1116,8 +1104,7 @@ void TasterTask (void *pvParameters)
 {
 	char DebTast1 = 0;
 	char DebTast2=0;
-	char mode=0;
-
+	long lRetVal=-1;
 
 	while(1){
 		//Taster1 rutine
@@ -1132,17 +1119,18 @@ void TasterTask (void *pvParameters)
 		//Taster 2 rutine
 		if(GPIOPinRead(GPIOA0_BASE, GPIO_PIN_7)==0){
 			if(DebTast2++ == DebounceTimeT2){
-				switch(mode){
+				switch(g_mode){
 					 case blink:{
-						 mode=setCOLOR;
-						 UART_PRINT("BLINK MODE to COLOR \n\r");
-						 osi_MsgQWrite(&MsgQCommands, "__SL_P_ULDCOLORChange_mode", OSI_NO_WAIT ); //menjaj mod na osnovu poruke
+						 osi_MsgQWrite(&MsgQCommands, g_StatusColor, OSI_NO_WAIT ); //menjaj mod na osnovu poruke
+						 if(lRetVal==0)
+							 UART_PRINT("BLINK MODE to COLOR \n\r");
 						 break;
 						 }
 					 case setCOLOR:{
-						 mode=blink;
-						 UART_PRINT("SET COLOR MODE \n\r");
+
 						 osi_MsgQWrite(&MsgQCommands, BLINKY_MES, OSI_NO_WAIT);
+						 if(lRetVal==0)
+							 UART_PRINT("SET COLOR MODE \n\r");
 						 break;
 						 }
 					 }
@@ -1160,7 +1148,6 @@ void TasterTask (void *pvParameters)
 		if(GPIOPinRead(GPIOA3_BASE, GPIO_PIN_1)==0){
 			PWM_Disable_2();
 			UART_PRINT("Overcurrent CH2 \n\r");
-
 		}
 		//Pwm3 overcurrent
 		if(GPIOPinRead(GPIOA2_BASE, GPIO_PIN_0)==0){
@@ -1175,16 +1162,15 @@ void TasterTask (void *pvParameters)
 
 void Bliky()
 {
-	pom^=1;
 	//
 	// Clear the timer interrupt.
 	//
 	Timer_IF_InterruptClear(ul_TIMERA1Base);
-	if(pom)
+	if(g_Toggle^=1)
 	{
-		PWM_Set1(100);
-		PWM_Set2(100);
-		PWM_Set3(100);
+		PWM_Set1(255);
+		PWM_Set2(255);
+		PWM_Set3(255);
 	}
 	else
 	{
@@ -1201,16 +1187,16 @@ void MoveMode()
 	//
 	Timer_IF_InterruptClear(ul_TIMERA0Base);
 
-	RedOld+=RedMove;
-	GreenOld+=GreenMove;
-	BlueOld+=BlueMove;
+	g_RedOld+=g_RedMove;
+	g_GreenOld+=g_GreenMove;
+	g_BlueOld+=g_BlueMove;
 
-	PWM_Set1(RedOld);
-	PWM_Set2(GreenOld);
-	PWM_Set3(BlueOld);
+	PWM_Set1(g_RedOld);
+	PWM_Set2(g_GreenOld);
+	PWM_Set3(g_BlueOld);
 
-	IntTransient-=100;
-	if(IntTransient<=0)
+	g_IntTransient-=100;
+	if(g_IntTransient<=0)
 		Timer_IF_Stop(ul_TIMERA0Base,TIMER_A);
 }
 
@@ -1303,6 +1289,8 @@ static void BoardInit(void) {
 //****************************************************************************
 //                            MAIN FUNCTION
 //****************************************************************************
+
+
 void main() {
 	long lRetVal = -1;
 
@@ -1314,6 +1302,12 @@ void main() {
 
 	//PWM Initializatoin
 	PWM_Init(10000);
+
+	//Initial state of pwm
+	PWM_Set1(0);
+	PWM_Set2(0);
+	PWM_Set3(0);
+
 
 	//Timer interrupt initialization
     TimerInterruptInit();
@@ -1390,8 +1384,8 @@ void main() {
     	UART_PRINT("Obj not create Task2\n\r");
 
     osi_SyncObjCreate(&ConnectSync);
-        if(lRetVal < 0)
-        	UART_PRINT("Obj not create ConnectSync\n\r");
+    if(lRetVal < 0)
+       	UART_PRINT("Obj not create ConnectSync\n\r");
 
 	//
 	// Start OS Scheduler

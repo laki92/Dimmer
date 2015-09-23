@@ -93,29 +93,29 @@ void PWM_Disable_3()
 
 void PWM_Set1(char temp)
 {
-	if(temp>100)
-		temp=100;
+	if(temp>255)
+		temp=255;
 	if(temp<=0)
 		temp=0;
-       TimerMatchSet(TIMERA2_BASE, TIMER_B, temp*((8000-1)/100));
+    TimerMatchSet(TIMERA2_BASE, TIMER_B, (255-temp)*(7999/255));
 
 }
 
 void PWM_Set2(char temp)
 {
-	if(temp>100)
-		temp=100;
+	if(temp>255)
+		temp=255;
 	if(temp<=0)
 		temp=0;
-    TimerMatchSet(TIMERA3_BASE, TIMER_A, temp*((8000-1)/100));
+    TimerMatchSet(TIMERA3_BASE, TIMER_A, (255-temp)*(7999/255));
 
 }
 
 void PWM_Set3(char temp)
 {
-	if(temp>100)
-		temp=100;
+	if(temp>255)
+		temp=255;
 	if(temp<=0)
 		temp=0;
-    TimerMatchSet(TIMERA3_BASE, TIMER_B, temp*((8000-1)/100));
+    TimerMatchSet(TIMERA3_BASE, TIMER_B, (255-temp)*(7999/255));
 }
